@@ -551,42 +551,75 @@ class Conv(TensorOp):
         self.stride = stride
         self.padding = padding
 
+    def compute_cudnn(self, A,B):
+        out = NDArray.cudnn_conv_forward(A, B, padding=self.padding, stride=self.stride)
+        return out
+
     def compute(self, A, B):
+        ### BEGIN YOUR SOLUTION
+        if (A.device.__str__() == "cuda()"):
+            print("using cudnn!")
+            return self.compute_cudnn(A,B)
+        else:
+            # raise NotImplementedError()
+            A_orig = A
+            if self.padding!=0:
+                A = A.pad(((0,0), (self.padding, self.padding), (self.padding, self.padding), (0,0))).compact()
+            N,H,W,C_in = A.shape
+            KH,KW,_,C_out = B.shape
+            out = NDArray(numpy.zeros((N,(H-KH+1)//self.stride,(W-KW+1)//self.stride,C_out)), device=A.device)
+            
+            for i in range(KH):
+                for j in range(KW):
+                    tmp = A[:,i:i+H-KH+1:self.stride,j:j+W-KW+1:self.stride,:].compact().reshape((numpy.prod(out.shape[0:3]), C_in)) \
+                        @ B[i,j,:,:].compact().reshape(B.shape[2:])
+                    out += tmp.compact().reshape(out.shape)
+            return out
+        ### END YOUR SOLUTION
 
-        A_pad = A.pad(((0, 0),) + ((self.padding, self.padding),)
-                      * 2 + ((0, 0),))
-        N, H, W, C_in = A_pad.shape
-        K, _, _, C_out = B.shape
-        Ns, Hs, Ws, Cs = A_pad.strides
+    def gradient_w_cudnn(self, out_grad, node):
+        x = node.inputs[0]
+        w = node.inputs[1]
+        N,H,W,C_in = x.shape
+        KH,KW,_,C_out = w.shape
+        out = Tensor(NDArray.cudnn_conv_backward_filter(out_grad.cached_data, x.cached_data, KH, KW, padding=self.padding, stride=self.stride))
+        return out
 
-        inner_dim = K * K * C_in
-        new_h = (H-K) // self.stride + 1
-        new_w = (W-K) // self.stride + 1
-        A2col = A_pad.as_strided(shape=(N, new_h, new_w, K, K, C_in),
-                                 strides=(Ns, Hs * self.stride, Ws * self.stride, Hs, Ws, Cs)).compact().reshape((N * new_h * new_w, inner_dim))
-        out = A2col @ B.reshape((K*K*C_in, C_out))
-        return out.reshape((N, new_h, new_w, C_out))
+    def gradient_x_cudnn(self, out_grad, node):
+        x = node.inputs[0]
+        w = node.inputs[1]
+        N,H,W,C_in = x.shape
+        KH,KW,_,C_out = w.shape
+        out = Tensor(NDArray.cudnn_conv_backward_data(out_grad.cached_data, w.cached_data, H, W, padding=self.padding, stride=self.stride))
+        return out
+
 
     def gradient(self, out_grad, node):
+        ### BEGIN YOUR SOLUTION
+        x = node.inputs[0]
+        w = node.inputs[1]
+        N,H,W,C_in = x.shape
+        KH,KW,_,C_out = w.shape
+        if (x.device.__str__() == "cuda()"):
+            print("using cudnn!")
+            w_grad = self.gradient_w_cudnn(out_grad, node)
+            x_grad = self.gradient_x_cudnn(out_grad, node)
+            return (x_grad, w_grad) 
+        else:
+            # raise NotImplementedError()
+            if (self.stride>1):
+                out_grad_d = dilate(out_grad, (1,2), self.stride-1)
+            else:
+                out_grad_d = out_grad
+            
+            _, oH, oW, _ = out_grad_d.shape
+            x_grad = conv(out_grad_d, transpose(flip(w,axes=(0,1)), (2, 3)), padding=KH-self.padding-1)
 
-        # out_grad   (N, (H-K+2P)//S+1, (W-K+2P)//S+1, C_out)
-        # x_grad    (N, H, W, C_in)
-        # w_grad    (K, K, C_in, C_out)
-        X, W = node.inputs
-        K, _, _, C_out = W.shape
-        # (H+2P-K+1)-K+1+2X = H-2K+2+2P+2X = H, X = K-P-1
-        # n,nh,nw,cout conv k,k,cout,cin -> n,h,w,cin
-        W = transpose(flip(W, (0, 1)), (2, 3))
-        if (self.stride > 1):
-            out_grad = dilate(out_grad, (1, 2), self.stride-1)
-        x_grad = conv(out_grad, W, 1, K-self.padding-1)
-        # H-(H-K+1+2P)+1+2X=K-2P+2X=K, X=P
-        # cin,w,h,n conv nw,nh,n,cout -> cin,kw,kh,cout
-        X = transpose(transpose(X, (1, 2)), (0, 3))
-        out_grad = transpose(out_grad, (0, 2))
-        w_grad = conv(X, out_grad, 1, self.padding)
-        w_grad = transpose(w_grad, (0, 2))
-        return x_grad, w_grad
+            w_grad = conv(transpose(x, (0,3)), transpose(transpose(out_grad_d, (0,1)), (1,2)), padding = (KH+oH-H-1)//2)
+            w_grad = transpose(transpose(w_grad, (0,1)), (1,2))
+            return (x_grad, w_grad)
+        ### END YOUR SOLUTION
+
 
 
 def conv(a, b, stride=1, padding=1):

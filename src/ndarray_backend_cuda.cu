@@ -609,7 +609,7 @@ void CudnnConvForward(const CudaArray& input, const CudaArray& filter, CudaArray
 
   cudnnConvolutionFwdAlgoPerf_t AlgoPerf[10];
   int RetAlgoNum = 0;
-  CUDNN_CALL(cudnnFindConvolutionForwardAlgorithm(
+  CUDNN_CALL(cudnnGetConvolutionForwardAlgorithm_v7(
         handle_,
         x_desc, w_desc, conv_desc, out_desc,
         1, &RetAlgoNum, AlgoPerf));
@@ -669,7 +669,7 @@ void CudnnConvBackwardData(const CudaArray& dy, const CudaArray& filter, CudaArr
 
   cudnnConvolutionBwdDataAlgoPerf_t AlgoPerf[10];
   int RetAlgoNum = 0;
-  CUDNN_CALL(cudnnFindConvolutionBackwardDataAlgorithm(
+  CUDNN_CALL(cudnnGetConvolutionBackwardDataAlgorithm_v7(
         handle_,
         w_desc, dy_desc, conv_desc, dx_desc,
         1, &RetAlgoNum, AlgoPerf));
@@ -729,7 +729,7 @@ void CudnnConvBackwardFilter(const CudaArray& dy, const CudaArray& x, CudaArray*
 
   cudnnConvolutionBwdFilterAlgoPerf_t AlgoPerf[10];
   int RetAlgoNum = 0;
-  CUDNN_CALL(cudnnFindConvolutionBackwardFilterAlgorithm(
+  CUDNN_CALL(cudnnGetConvolutionBackwardFilterAlgorithm_v7(
         handle_,
         x_desc, dy_desc, conv_desc, dw_desc,
         1, &RetAlgoNum, AlgoPerf));

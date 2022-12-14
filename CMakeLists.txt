@@ -74,7 +74,7 @@ if(CUDA_FOUND)
   # set arch flags properly
   CUDA_ADD_LIBRARY(ndarray_backend_cuda MODULE src/ndarray_backend_cuda.cu OPTIONS ${ARCH_FLAGS})
 
-  target_link_libraries(ndarray_backend_cuda ${LINKER_LIBS})
+  target_link_libraries(ndarray_backend_cuda ${LINKER_LIBS} cudnn cublas)
   pybind11_extension(ndarray_backend_cuda)
   pybind11_strip(ndarray_backend_cuda)
 

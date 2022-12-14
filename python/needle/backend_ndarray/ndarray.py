@@ -567,8 +567,15 @@ class NDArray:
 
         m, n, p = self.shape[0], self.shape[1], other.shape[1]
 
+        if self.device.__str__() == "cuda()":
+            out = NDArray.make((m, p), device=self.device)
+            self.device.MatmulCublas(
+                self.compact()._handle, other.compact()._handle, out._handle, m, n, p
+            )
+            return out
+
         # if the matrix is aligned, use tiled matrix multiplication
-        if hasattr(self.device, "matmul_tiled") and all(
+        elif hasattr(self.device, "matmul_tiled") and all(
             d % self.device.__tile_size__ == 0 for d in (m, n, p)
         ):
 

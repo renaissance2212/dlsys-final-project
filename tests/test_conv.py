@@ -11,6 +11,27 @@ import itertools
 _DEVICES = [ndl.cpu(), pytest.param(ndl.cuda(),
     marks=pytest.mark.skipif(not ndl.cuda().enabled(), reason="No GPU"))]
 
+
+MATMUL_DIMS = [(16, 16, 16),
+    (8, 8, 8),
+    (1, 2, 3),
+    (3, 4, 5),
+    (5, 4, 3),
+    (16, 16, 32),
+    (64, 64, 64),
+    (72, 72, 72),
+    (72, 73, 74),
+    (74, 73, 72),
+    (128, 128, 128)]
+@pytest.mark.parametrize("m,n,p", MATMUL_DIMS)
+@pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
+def test_matmul(m, n, p, device):
+    _A = np.random.randn(m, n).astype(np.float32)
+    _B = np.random.randn(n, p).astype(np.float32)
+    A = ndl.Tensor(nd.array(_A), device=device)
+    B = ndl.Tensor(nd.array(_B), device=device)
+    np.testing.assert_allclose(_A @ _B, (A @ B).numpy(), atol=1e-5, rtol=1e-5)
+
 conv_forward_params = [
     (4, 8, 16, 3, 1),
     (32, 8, 16, 3, 2),

@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include <cudnn.h>
+#include <cublas_v2.h>
 namespace needle {
 namespace cuda {
 
@@ -490,6 +491,40 @@ void Matmul(const CudaArray &a, const CudaArray &b, CudaArray *out, uint32_t M,
   }
 }
 
+#define CUBLAS_CALL(f) { \
+  cublasStatus_t Status = (f); \
+  if (Status != CUBLAS_STATUS_SUCCESS) { \
+    std::cout \
+        << "    Error occurred: " << Status << std::endl; \
+    std::exit(1); \
+  } \
+}
+
+void MatmulCublas(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, uint32_t N,
+            uint32_t P) {
+  /**
+   *
+   * Args:
+   *   a: compact 2D array of size m x n
+   *   b: comapct 2D array of size n x p
+   *   out: compact 2D array of size m x p to write the output to
+   *   M: rows of a / out
+   *   N: columns of a / rows of b
+   *   P: columns of b / out
+   */
+
+  cublasHandle_t handle_;
+  CUBLAS_CALL(cublasCreate(&handle_));
+
+  float alpha = 1.0;
+  float beta = 0.0;
+  // compute C_T = B_T*A_T , because cublas uses col-major input and output
+  CUBLAS_CALL(cublasSgemmEx(handle_, CUBLAS_OP_N, CUBLAS_OP_N, P, M, N, &alpha, b.ptr, CUDA_R_32F, P, a.ptr, CUDA_R_32F, N, 
+                &beta, out->ptr, CUDA_R_32F, P));
+  // CUBLAS_CALL(cublasSgemm_v2(handle_, CUBLAS_OP_N, CUBLAS_OP_N,P, M, N, &alpha, b.ptr, P, a.ptr, N, 
+  //             &beta, out->ptr, P));
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Max and sum reductions
 ////////////////////////////////////////////////////////////////////////////////
@@ -823,7 +858,7 @@ PYBIND11_MODULE(ndarray_backend_cuda, m) {
   m.def("ewise_tanh", EwiseTanh);
 
   m.def("matmul", Matmul);
-
+  m.def("MatmulCublas", MatmulCublas);
   m.def("CudnnConvForward", CudnnConvForward);
   m.def("CudnnConvBackwardFilter", CudnnConvBackwardFilter);
   m.def("CudnnConvBackwardData", CudnnConvBackwardData);

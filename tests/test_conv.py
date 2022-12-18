@@ -8,8 +8,7 @@ import needle as ndl
 import itertools
 
 
-_DEVICES = [ndl.cpu(), pytest.param(ndl.cuda(),
-    marks=pytest.mark.skipif(not ndl.cuda().enabled(), reason="No GPU"))]
+_DEVICES = [ndl.cpu(), ndl.cuda()]
 
 
 MATMUL_DIMS = [(16, 16, 16),

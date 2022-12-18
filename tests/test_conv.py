@@ -39,7 +39,7 @@ conv_forward_params = [
     (32, 16, 8, 3, 2)
 ]
 @pytest.mark.parametrize("s,cin,cout,k,stride", conv_forward_params)
-@pytest.mark.parametrize("device", _DEVICES)
+@pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
 def test_nn_conv_forward(s, cin, cout, k, stride, device):
     np.random.seed(0)
     import torch
@@ -65,7 +65,7 @@ conv_back_params = [
     (14, 16, 8, 3, 2),
 ]
 @pytest.mark.parametrize("s,cin,cout,k,stride", conv_back_params)
-@pytest.mark.parametrize("device", _DEVICES)
+@pytest.mark.parametrize("device", _DEVICES, ids=["cpu", "cuda"])
 def test_nn_conv_backward(s, cin, cout, k, stride, device):
     np.random.seed(0)
     import torch
